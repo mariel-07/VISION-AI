@@ -19,7 +19,7 @@ import { useAuth } from '../../modules/auth/services/AuthContext'
 import { readAlerts } from '../../shared/services/store'
 
 const primaryLinks = [
-  { to: '/', label: 'Resumen General', icon: LayoutDashboard, end: true },
+  { to: '/dashboard', label: 'Resumen General', icon: LayoutDashboard },
   { to: '/analysis', label: 'Análisis Visual & Cámaras', icon: ScanEye },
 ]
 const visionLinks = [
@@ -37,6 +37,7 @@ const adminLinks = [
 ]
 
 const titles: Record<string, string> = {
+  '/dashboard': 'Resumen General de Planta',
   '/': 'Resumen General de Planta',
   '/analysis': 'Estación de Análisis Visual & Cámaras',
   '/detections': 'Inventario de Detecciones EPP',
@@ -56,7 +57,7 @@ function NavGroup({ label, links, badgeCount }: { label: string; links: typeof p
         <NavLink
           key={to}
           to={to}
-          end={'end' in rest ? rest.end : false}
+          end={'end' in rest ? Boolean((rest as { end?: boolean }).end) : false}
           className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
         >
           <Icon size={17} strokeWidth={1.8} />

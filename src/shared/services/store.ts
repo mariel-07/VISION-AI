@@ -299,9 +299,62 @@ export function readAnalyses(): Analysis[] {
   return value
 }
 
+export type ActiveFrameData = {
+  imageData: string
+  sourceName: string
+  scenario: string
+  detections: Detection[]
+  timestamp: number
+  width?: number
+  height?: number
+  engine?: string
+  alerts?: string[]
+}
+
+const ACTIVE_FRAME_KEY = 'vision-ai-active-frame-v1'
+
+export function saveActiveFrame(data: ActiveFrameData): void {
+  try {
+    localStorage.setItem(ACTIVE_FRAME_KEY, JSON.stringify(data))
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('vision-ai-frame-update', { detail: data }))
+    }
+  } catch (error) {
+    // Si la imagen es muy grande para localStorage, despachamos el evento en memoria igualmente
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('vision-ai-frame-update', { detail: data }))
+    }
+  }
+}
+
+export function getActiveFrame(): ActiveFrameData | null {
+  try {
+    const raw = localStorage.getItem(ACTIVE_FRAME_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
 export function saveAnalysis(item: Analysis): Analysis[] {
   const all = [item, ...readAnalyses().filter(existing => existing.id !== item.id)].slice(0, 300)
   writeJson(KEYS.analyses, all)
+  if (item.imageData) {
+    saveActiveFrame({
+      imageData: item.imageData,
+      sourceName: item.sourceName,
+      scenario: item.scenario,
+      detections: item.detections,
+      timestamp: Date.now(),
+      width: item.width,
+      height: item.height,
+      engine: item.engine,
+      alerts: item.alerts
+    })
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vision-ai-analysis-saved', { detail: item }))
+  }
   return all
 }
 

@@ -1,13 +1,13 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
+  ArrowLeft,
   ArrowRight,
   Eye,
   EyeOff,
   HardHat,
   Layers3,
   ScanEye,
-
   Sparkles
 } from 'lucide-react'
 import { useAuth } from '../services/AuthContext'
@@ -33,7 +33,7 @@ export default function LoginPage() {
       setError('Credenciales incorrectas. Verifica tus datos de acceso.')
       return
     }
-    navigate('/')
+    navigate('/dashboard')
   }
 
   return (
@@ -121,6 +121,22 @@ export default function LoginPage() {
               VISION<span>AI</span>
             </strong>
           </div>
+
+          <Link
+            to="/"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: '#64748b',
+              marginBottom: '20px',
+              textDecoration: 'none'
+            }}
+          >
+            <ArrowLeft size={14} /> Volver a la Landing Page
+          </Link>
 
           <div className="login-heading">
             <div className="login-tag">ACCESO CORPORATIVO</div>

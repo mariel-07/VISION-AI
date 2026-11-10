@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Save,
   Send,
+  ShieldCheck,
   SlidersHorizontal,
   Smartphone,
   Sparkles,
@@ -32,12 +33,14 @@ import {
   AVAILABLE_GEMINI_MODELS,
   getGeminiApiKey,
   getGeminiModel,
+  resetGeminiConfigToDefault,
   setGeminiApiKey,
   setGeminiModel,
   testGeminiConnection
 } from '../../../shared/services/geminiVision'
 import {
   getTelegramConfig,
+  resetTelegramConfigToDefault,
   setTelegramConfig,
   testTelegramNotification,
   type TelegramConfig
@@ -70,12 +73,48 @@ export default function SettingsPage() {
   const [telegramTesting, setTelegramTesting] = useState(false)
   const [telegramStatus, setTelegramStatus] = useState<{ success?: boolean; message?: string } | null>(null)
 
+  const [credentialsNotice, setCredentialsNotice] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [revision, setRevision] = useState(0)
 
   const usageKb = useMemo(() => (getLocalStorageUsage() / 1024).toFixed(1), [revision])
   const analyses = readAnalyses()
   const alerts = readAlerts()
+
+  // Guardado reactivo inmediato de credenciales para que jamás se pierdan entre pestañas/módulos
+  function updateGeminiKey(val: string) {
+    setGeminiKeyState(val)
+    setGeminiApiKey(val)
+  }
+
+  function updateGeminiModel(val: string) {
+    setGeminiModelState(val)
+    setGeminiModel(val)
+  }
+
+  function updateTelegramConfig(partial: Partial<TelegramConfig>) {
+    const updated = { ...telegramConfig, ...partial }
+    setTelegramConfigState(updated)
+    setTelegramConfig(updated)
+  }
+
+  function handleSaveAllCredentials() {
+    setGeminiApiKey(geminiKey)
+    setGeminiModel(geminiModel)
+    setTelegramConfig(telegramConfig)
+    setCredentialsNotice('✓ Credenciales guardadas y fijadas permanentemente en este dispositivo.')
+    window.setTimeout(() => setCredentialsNotice(null), 3500)
+  }
+
+  function handleResetCredentialsToDefaults() {
+    const defaultGemini = resetGeminiConfigToDefault()
+    const defaultTelegram = resetTelegramConfigToDefault()
+    setGeminiKeyState(defaultGemini.key)
+    setGeminiModelState(defaultGemini.model)
+    setTelegramConfigState(defaultTelegram)
+    setCredentialsNotice('✓ Credenciales restablecidas a los valores de Vercel/Producción.')
+    window.setTimeout(() => setCredentialsNotice(null), 3500)
+  }
 
   function save() {
     setSettings(settings)
@@ -90,11 +129,18 @@ export default function SettingsPage() {
   async function handleTestGemini() {
     setGeminiTesting(true)
     setGeminiStatus(null)
+    // Auto-persistir inmediatamente antes de comprobar
+    setGeminiApiKey(geminiKey)
+    setGeminiModel(geminiModel)
     try {
       const res = await testGeminiConnection(geminiKey)
       setGeminiStatus({ success: res.success, message: res.message })
-      if (res.success && res.model) {
-        setGeminiModelState(res.model)
+      if (res.success) {
+        setGeminiApiKey(geminiKey)
+        if (res.model) {
+          setGeminiModelState(res.model)
+          setGeminiModel(res.model)
+        }
       }
     } catch (err) {
       setGeminiStatus({
@@ -109,9 +155,14 @@ export default function SettingsPage() {
   async function handleTestTelegram() {
     setTelegramTesting(true)
     setTelegramStatus(null)
+    // Auto-persistir inmediatamente antes de enviar la prueba
+    setTelegramConfig(telegramConfig)
     try {
       const res = await testTelegramNotification(telegramConfig.botToken, telegramConfig.chatId)
       setTelegramStatus({ success: res.success, message: res.message })
+      if (res.success) {
+        setTelegramConfig(telegramConfig)
+      }
     } catch (err) {
       setTelegramStatus({
         success: false,
@@ -203,6 +254,95 @@ export default function SettingsPage() {
           </label>
         </div>
 
+        {/* PANEL MAESTRO DE CREDENCIALES DEL SISTEMA (VERCEL / PRODUCCIÓN) */}
+        <div
+          className="rule-settings"
+          style={{
+            border: '2px solid #3b82f6',
+            borderRadius: '10px',
+            background: 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)',
+            padding: '16px 18px',
+            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.08)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={20} color="#2563eb" />
+              <div>
+                <h3 style={{ margin: 0, color: '#1e3a8a', fontSize: '14px', fontWeight: 700 }}>
+                  Credenciales Maestras del Sistema (Persistencia Permanente en Vercel)
+                </h3>
+                <span style={{ fontSize: '11px', color: '#475569' }}>
+                  Determinadas para que cualquier persona que entre a la plataforma cuente inmediatamente con IA y Telegram activo.
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: '#dcfce7',
+                  color: '#166534',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '4px 10px',
+                  borderRadius: '12px',
+                  border: '1px solid #86efac'
+                }}
+              >
+                <CheckCircle2 size={13} /> Integradas y Fijas
+              </span>
+            </div>
+          </div>
+
+          <p style={{ margin: '0 0 12px', fontSize: '11px', color: '#334155', lineHeight: 1.5 }}>
+            Los 4 valores clave (<b>Gemini API Key</b>, <b>Modelo de IA</b>, <b>Bot Token Telegram</b> y <b>Chat ID</b>) están configurados con valores predeterminados de fábrica y guardado automático en este navegador. Puedes modificarlos en los paneles inferiores o restablecerlos cuando lo desees.
+          </p>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="primary-button small"
+              onClick={handleSaveAllCredentials}
+              style={{ fontSize: '11px', padding: '7px 16px', background: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Save size={13} /> Guardar y Fijar Credenciales Permanentemente
+            </button>
+            <button
+              type="button"
+              className="secondary-button small"
+              onClick={handleResetCredentialsToDefaults}
+              style={{ fontSize: '11px', padding: '7px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              title="Restablece las 4 credenciales fijas de Vercel (Gemini y Telegram)"
+            >
+              <RefreshCw size={13} /> Restablecer a Valores Predeterminados
+            </button>
+          </div>
+
+          {credentialsNotice && (
+            <div
+              style={{
+                marginTop: '10px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                background: '#f0fdf4',
+                border: '1px solid #86efac',
+                color: '#166534',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <CheckCircle2 size={15} />
+              <span>{credentialsNotice}</span>
+            </div>
+          )}
+        </div>
+
         {/* Clave de Google Gemini API */}
         <div className="rule-settings" style={{ borderLeft: '4px solid #2563eb', paddingLeft: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
@@ -231,7 +371,7 @@ export default function SettingsPage() {
                 type={showGeminiKey ? 'text' : 'password'}
                 placeholder="Introduce tu clave de API de Gemini (ej: AIzaSy...)"
                 value={geminiKey}
-                onChange={e => setGeminiKeyState(e.target.value)}
+                onChange={e => updateGeminiKey(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '10px 36px 10px 12px',
@@ -264,7 +404,7 @@ export default function SettingsPage() {
             <div>
               <select
                 value={geminiModel}
-                onChange={e => setGeminiModelState(e.target.value)}
+                onChange={e => updateGeminiModel(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -276,7 +416,7 @@ export default function SettingsPage() {
               >
                 {AVAILABLE_GEMINI_MODELS.map(m => (
                   <option key={m} value={m}>
-                    {m} {m === 'gemini-1.5-flash' ? '(Recomendado)' : ''}
+                    {m} {m === 'gemini-3.8-flash' ? '(Predeterminado)' : ''}
                   </option>
                 ))}
               </select>
@@ -295,7 +435,7 @@ export default function SettingsPage() {
               {geminiTesting ? 'Comprobando clave...' : 'Probar Conexión con Gemini'}
             </button>
             <small style={{ color: '#64748b', fontSize: '10px' }}>
-              Verifica que el modelo y la cuota de tu API Key respondan en vivo.
+              Verifica y guarda permanentemente el modelo y la cuota de tu API Key en vivo.
             </small>
           </div>
 
@@ -394,7 +534,7 @@ export default function SettingsPage() {
                   type={showTelegramToken ? 'text' : 'password'}
                   placeholder="ej: 7123456789:AAHqj_..."
                   value={telegramConfig.botToken}
-                  onChange={e => setTelegramConfigState({ ...telegramConfig, botToken: e.target.value })}
+                  onChange={e => updateTelegramConfig({ botToken: e.target.value })}
                   style={{
                     width: '100%',
                     padding: '8px 36px 8px 10px',
@@ -431,7 +571,7 @@ export default function SettingsPage() {
                 type="text"
                 placeholder="ej: 123456789"
                 value={telegramConfig.chatId}
-                onChange={e => setTelegramConfigState({ ...telegramConfig, chatId: e.target.value })}
+                onChange={e => updateTelegramConfig({ chatId: e.target.value })}
                 style={{
                   width: '100%',
                   padding: '8px 10px',
@@ -449,7 +589,7 @@ export default function SettingsPage() {
               <input
                 type="checkbox"
                 checked={telegramConfig.enabled}
-                onChange={e => setTelegramConfigState({ ...telegramConfig, enabled: e.target.checked })}
+                onChange={e => updateTelegramConfig({ enabled: e.target.checked })}
               />
               <b>Habilitar despacho automático de alertas a mi celular</b>
             </label>
@@ -458,7 +598,7 @@ export default function SettingsPage() {
               <span>Intervalo anti-inundación (Cooldown):</span>
               <select
                 value={telegramConfig.cooldownSeconds}
-                onChange={e => setTelegramConfigState({ ...telegramConfig, cooldownSeconds: Number(e.target.value) })}
+                onChange={e => updateTelegramConfig({ cooldownSeconds: Number(e.target.value) })}
                 style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '11px' }}
               >
                 <option value={15}>15 segundos</option>
@@ -482,7 +622,7 @@ export default function SettingsPage() {
               {telegramTesting ? 'Enviando a tu celular...' : 'Probar Envío al Celular (Telegram)'}
             </button>
             <small style={{ color: '#64748b', fontSize: '10px' }}>
-              Enviará un mensaje instantáneo a tu celular confirmando la conexión.
+              Enviará un mensaje instantáneo a tu celular y fijará permanentemente las credenciales.
             </small>
           </div>
 

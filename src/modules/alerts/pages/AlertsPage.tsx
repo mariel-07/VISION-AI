@@ -40,7 +40,8 @@ export default function AlertsPage() {
     const res = await sendTelegramAlert({
       severity: alert.severity,
       message: alert.message,
-      scenario: alert.scenario
+      scenario: alert.scenario,
+      force: true
     })
     if (res.sent) {
       setTelegramNotice(`✓ Alerta ${alert.id} enviada exitosamente a tu celular.`)

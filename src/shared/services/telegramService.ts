@@ -7,6 +7,12 @@ export type TelegramConfig = {
   cooldownSeconds: number
 }
 
+// Credenciales Maestras Predeterminadas (Vercel / Producción)
+export const DEFAULT_TELEGRAM_BOT_TOKEN = '9139525202:AAEzoVokGv303ifb4cuoFHHnjf4OhONwRRU'
+export const DEFAULT_TELEGRAM_CHAT_ID = '8794525782'
+export const DEFAULT_TELEGRAM_ALERTS_ENABLED = true
+export const DEFAULT_TELEGRAM_COOLDOWN = 45
+
 const STORAGE_KEYS = {
   token: 'vision_ai_telegram_bot_token',
   chatId: 'vision_ai_telegram_chat_id',
@@ -16,14 +22,20 @@ const STORAGE_KEYS = {
 
 export function getTelegramConfig(): TelegramConfig {
   try {
+    const rawToken = localStorage.getItem(STORAGE_KEYS.token)
+    const envToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN
     const token =
-      localStorage.getItem(STORAGE_KEYS.token) ||
-      import.meta.env.VITE_TELEGRAM_BOT_TOKEN ||
-      ''
+      (rawToken && rawToken.trim()) ||
+      (envToken && envToken.trim()) ||
+      DEFAULT_TELEGRAM_BOT_TOKEN
+
+    const rawChatId = localStorage.getItem(STORAGE_KEYS.chatId)
+    const envChatId = import.meta.env.VITE_TELEGRAM_CHAT_ID
     const chatId =
-      localStorage.getItem(STORAGE_KEYS.chatId) ||
-      import.meta.env.VITE_TELEGRAM_CHAT_ID ||
-      ''
+      (rawChatId && rawChatId.trim()) ||
+      (envChatId && envChatId.trim()) ||
+      DEFAULT_TELEGRAM_CHAT_ID
+
     const storedEnabled = localStorage.getItem(STORAGE_KEYS.enabled)
     const envEnabled = import.meta.env.VITE_TELEGRAM_ALERTS_ENABLED
     const enabled =
@@ -31,12 +43,12 @@ export function getTelegramConfig(): TelegramConfig {
         ? storedEnabled === 'true'
         : envEnabled !== undefined
         ? envEnabled === 'true' || envEnabled === true
-        : Boolean(token && chatId)
+        : DEFAULT_TELEGRAM_ALERTS_ENABLED
 
     const rawCooldown =
       localStorage.getItem(STORAGE_KEYS.cooldown) ||
       import.meta.env.VITE_TELEGRAM_COOLDOWN_SECONDS ||
-      '45'
+      String(DEFAULT_TELEGRAM_COOLDOWN)
     const cooldownSeconds = Number(rawCooldown)
 
     return {
@@ -46,16 +58,27 @@ export function getTelegramConfig(): TelegramConfig {
       cooldownSeconds:
         Number.isFinite(cooldownSeconds) && cooldownSeconds >= 5
           ? cooldownSeconds
-          : 45
+          : DEFAULT_TELEGRAM_COOLDOWN
     }
   } catch {
     return {
-      botToken: import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '',
-      chatId: import.meta.env.VITE_TELEGRAM_CHAT_ID || '',
-      enabled: false,
-      cooldownSeconds: 45
+      botToken: DEFAULT_TELEGRAM_BOT_TOKEN,
+      chatId: DEFAULT_TELEGRAM_CHAT_ID,
+      enabled: DEFAULT_TELEGRAM_ALERTS_ENABLED,
+      cooldownSeconds: DEFAULT_TELEGRAM_COOLDOWN
     }
   }
+}
+
+export function resetTelegramConfigToDefault(): TelegramConfig {
+  const defaultConfig: TelegramConfig = {
+    botToken: DEFAULT_TELEGRAM_BOT_TOKEN,
+    chatId: DEFAULT_TELEGRAM_CHAT_ID,
+    enabled: DEFAULT_TELEGRAM_ALERTS_ENABLED,
+    cooldownSeconds: DEFAULT_TELEGRAM_COOLDOWN
+  }
+  setTelegramConfig(defaultConfig)
+  return defaultConfig
 }
 
 export function setTelegramConfig(config: Partial<TelegramConfig>): void {
@@ -109,17 +132,19 @@ function escapeHtml(text: string): string {
 /**
  * Envía una notificación de alerta alta o crítica a Telegram.
  * Incluye protección contra inundación (anti-spam / cooldown).
+ * Soporta force=true para despachos manuales desde la tabla de alertas.
  */
 export async function sendTelegramAlert(alert: {
   severity: string
   message: string
   scenario?: string
+  force?: boolean
 }): Promise<{ sent: boolean; reason?: string }> {
   const isHighSeverity =
     alert.severity === 'Alta' || alert.severity === 'Crítica'
 
-  // Solo las alertas de severidad Alta o Crítica se despachan al celular
-  if (!isHighSeverity) {
+  // Si no es forzada, solo las alertas de severidad Alta o Crítica se despachan
+  if (!alert.force && !isHighSeverity) {
     return {
       sent: false,
       reason: 'La severidad no califica para alerta inmediata (solo Alta/Crítica)'
@@ -128,7 +153,7 @@ export async function sendTelegramAlert(alert: {
 
   const config = getTelegramConfig()
 
-  if (!config.enabled) {
+  if (!config.enabled && !alert.force) {
     return { sent: false, reason: 'Notificaciones a Telegram desactivadas' }
   }
 
@@ -141,8 +166,8 @@ export async function sendTelegramAlert(alert: {
 
   const now = Date.now()
 
-  // Evitar ráfagas masivas en vivo: mínimo 3 segundos entre cualquier mensaje
-  if (now - lastAnyAlertTimestamp < 3000) {
+  // Evitar ráfagas masivas en vivo salvo que sea forzada por clic directo del usuario
+  if (!alert.force && now - lastAnyAlertTimestamp < 3000) {
     return { sent: false, reason: 'Límite de ráfaga global activo (3s)' }
   }
 
@@ -151,7 +176,7 @@ export async function sendTelegramAlert(alert: {
   const lastSent = recentAlertTimestamps.get(alertKey) || 0
   const cooldownMs = config.cooldownSeconds * 1000
 
-  if (now - lastSent < cooldownMs) {
+  if (!alert.force && now - lastSent < cooldownMs) {
     const remaining = Math.ceil((cooldownMs - (now - lastSent)) / 1000)
     return {
       sent: false,
@@ -289,9 +314,16 @@ export async function testTelegramNotification(
     }
 
     if (res.ok && data.ok) {
+      // Guardar automáticamente credenciales válidas en almacenamiento persistente
+      setTelegramConfig({
+        botToken: useToken,
+        chatId: useChatId,
+        enabled: true
+      })
+
       return {
         success: true,
-        message: '¡Mensaje de prueba recibido en tu Telegram! Conexión verificada exitosamente.'
+        message: '¡Mensaje de prueba recibido en tu Telegram! Conexión verificada y guardada exitosamente.'
       }
     }
 

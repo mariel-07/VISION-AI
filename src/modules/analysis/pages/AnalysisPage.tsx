@@ -605,6 +605,7 @@ export default function AnalysisPage() {
         detections: inferResult.detections,
         patterns: inferResult.patterns.map(p => `${p.name}: ${p.evidence}`),
         alerts: inferResult.alerts.map(a => a.message),
+        imageData: preview,
         width: inferResult.width,
         height: inferResult.height,
         volumeCm3: 35000,
@@ -689,6 +690,7 @@ export default function AnalysisPage() {
         alerts: report.riskLevel === 'Crítico' || report.riskLevel === 'Alto'
           ? [report.executiveSummary]
           : [],
+        imageData: preview,
         width: 1280,
         height: 720,
         volumeCm3: null,
@@ -819,6 +821,20 @@ export default function AnalysisPage() {
 
           if (Date.now() - lastPersistRef.current > 3500) {
             lastPersistRef.current = Date.now()
+            let liveSnap = ''
+            try {
+              if (videoRef.current && videoRef.current.videoWidth > 0) {
+                const offCanvas = document.createElement('canvas')
+                offCanvas.width = 640
+                offCanvas.height = 360
+                const ctx = offCanvas.getContext('2d')
+                if (ctx) {
+                  ctx.drawImage(videoRef.current, 0, 0, 640, 360)
+                  liveSnap = offCanvas.toDataURL('image/jpeg', 0.6)
+                }
+              }
+            } catch {}
+
             saveAnalysis({
               id: liveAnalysisId.current,
               createdAt: liveAnalysisCreatedAt.current,
@@ -831,6 +847,7 @@ export default function AnalysisPage() {
               detections: r.detections,
               patterns: r.patterns.map(p => `${p.name}: ${p.evidence}`),
               alerts: r.alerts.map(a => a.message),
+              imageData: liveSnap,
               width: r.width,
               height: r.height,
               volumeCm3: null,
@@ -1083,6 +1100,9 @@ export default function AnalysisPage() {
     try {
       const res = await testGeminiConnection(apiKeyInput)
       setModalKeyStatus({ success: res.success, message: res.message })
+      if (res.success) {
+        setGeminiApiKey(apiKeyInput)
+      }
     } catch (err) {
       setModalKeyStatus({
         success: false,
