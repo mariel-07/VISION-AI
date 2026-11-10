@@ -1,0 +1,10 @@
+Carpeta de modelos para el navegador (se publican con Vercel).
+
+OBLIGATORIO
+  yolov8n.onnx          -> generar con:  python scripts/exportar_modelo_onnx.py
+
+OPCIONAL (detección de EPP, solo escenario "Seguridad industrial")
+  epp.onnx              -> generado con scripts/entrenar_epp_colab.py
+  epp.labels.json       -> lista de clases en el mismo orden que el modelo
+
+Sin epp.onnx el escenario de seguridad usa el modelo general y NO verifica EPP.

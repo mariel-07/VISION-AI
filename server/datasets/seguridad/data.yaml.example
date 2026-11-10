@@ -1,0 +1,18 @@
+# Plantilla: copia este archivo como data.yaml y ajusta la ruta al dataset.
+# No contiene imágenes ni etiquetas. Debes crear y validar tu propio dataset.
+path: ./datasets/seguridad
+train: images/train
+val: images/val
+
+names:
+  0: person
+  1: helmet
+  2: vest
+  3: gloves
+  4: goggles
+  5: boots
+  6: no_helmet
+  7: no_vest
+  8: no_gloves
+  9: no_goggles
+  10: no_boots
